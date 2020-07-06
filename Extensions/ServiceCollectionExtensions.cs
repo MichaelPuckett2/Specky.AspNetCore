@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Specky.Dtos;
+using Specky.Enums;
 using Specky.Extensions;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace Specky.AspNetCore.Extensions
@@ -16,34 +18,33 @@ namespace Specky.AspNetCore.Extensions
             SpeckyContainer
                 .Instance
                 .InjectedSpecks
-                .Select(x => x.Type)
-                .ForEach(type =>
+                .ForEach(speckDto =>
                 {
-                    var speckDto = SpeckyContainer.Instance.InjectedSpecks.FirstOrDefault(x => x.Type == type);
-
-                    type.GetInterfaces()
-                        .ForEach(intface =>
-                        {
-                            switch (speckDto.DeliveryMode)
-                            {
-                                case Enums.DeliveryMode.SingleInstance:
-                                case Enums.DeliveryMode.Singleton:
-                                    serviceCollection.AddSingleton(intface, x => SpeckyContainer.Instance.GetSpeck(type));
-                                    break;
-                                case Enums.DeliveryMode.PerRequest:
-                                case Enums.DeliveryMode.Scoped:
-                                    serviceCollection.AddScoped(intface, x => SpeckyContainer.Instance.GetSpeck(type));
-                                    break;
-                                case Enums.DeliveryMode.DataSet:
-                                case Enums.DeliveryMode.Transient:
-                                default:
-                                    serviceCollection.AddTransient(intface, x => SpeckyContainer.Instance.GetSpeck(type));
-                                    break;
-                            }
-                        });
+                    InjectSpeckType(serviceCollection, speckDto.DeliveryMode, speckDto.Type);
+                    speckDto.Type.GetInterfaces().ForEach(x => InjectSpeckType(serviceCollection, speckDto.DeliveryMode, x));
                 });
 
             return serviceCollection;
+        }
+
+        private static void InjectSpeckType(IServiceCollection serviceCollection, DeliveryMode deliveryMode, Type type, Type implementationType = null)
+        {
+            switch (deliveryMode)
+            {
+                case DeliveryMode.SingleInstance:
+                case DeliveryMode.Singleton:
+                    serviceCollection.AddSingleton(type, x => SpeckyContainer.Instance.GetSpeck(implementationType ?? type));
+                    break;
+                case DeliveryMode.PerRequest:
+                case DeliveryMode.Scoped:
+                    serviceCollection.AddScoped(type, x => SpeckyContainer.Instance.GetSpeck(implementationType ?? type));
+                    break;
+                case DeliveryMode.DataSet:
+                case DeliveryMode.Transient:
+                default:
+                    serviceCollection.AddTransient(type, x => SpeckyContainer.Instance.GetSpeck(implementationType ?? type));
+                    break;
+            }
         }
     }
 }
